@@ -418,6 +418,8 @@ export const ResponseMessages = {
       noLedgerFound: 'No ledger data not found.',
       agentSpinupError: 'Agent endpoint unreachable',
       agentEndpointRequired: 'Agent endpoint is required',
+      publicAgentEndpointNotConfigured:
+        'No public endpoint is configured for this agent yet. Configure a publicly reachable endpoint for this organization before creating a did:web DID.',
       failedAgentType: 'Agent endpoint is required',
       failedApiKey: 'Failed to encrypt API key',
       failedOrganization: 'Failed to fetch organization agent type details',

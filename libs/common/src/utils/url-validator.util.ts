@@ -16,7 +16,7 @@ function sanitizeUrlForLog(rawUrl: string): string {
   }
 }
 
-function isPrivateIp(ip: string): boolean {
+export function isPrivateIp(ip: string): boolean {
   // IPv4-mapped IPv6: ::ffff:x.x.x.x
   const ipv4MappedMatch = ip.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i);
   if (ipv4MappedMatch) {
@@ -119,4 +119,67 @@ export async function isValidWebhookUrl(url: string): Promise<{ isSafe: boolean;
     logger.error(`Error validating webhook URL: ${error.message}`);
     return { isSafe: false };
   }
+}
+
+const LOOPBACK_HOSTNAMES = new Set(['localhost', 'localhost.localdomain']);
+// At least one dot - a bare single-label name is almost always an internal
+// hostname rather than something with real public DNS delegation.
+const HOSTNAME_REGEX = /^(?=.{1,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}$/;
+const IPV4_LITERAL_REGEX = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+
+function stripDidWebPort(domain: string): string {
+  if (domain.startsWith('[')) {
+    const closeBracket = domain.indexOf(']');
+    return -1 === closeBracket ? domain : domain.slice(0, closeBracket + 1);
+  }
+  // A bare IPv6 literal is itself made of multiple colons - only a single
+  // colon unambiguously means "host:port" for a hostname/IPv4 address.
+  if (2 <= (domain.match(/:/g) ?? []).length) {
+    return domain;
+  }
+  const portMatch = /^(.*):(\d+)$/.exec(domain);
+  return portMatch ? portMatch[1] : domain;
+}
+
+/**
+ * Syntax/range check only - no DNS lookup, unlike isValidWebhookUrl above.
+ * did:web domains are supplied once at DID-creation time and don't need
+ * (and shouldn't pay the cost/flakiness of) a live network round-trip just
+ * to validate the shape of the domain.
+ */
+export function validateDidWebDomain(domain: string): { valid: boolean; reason?: string } {
+  if (!domain || !domain.trim()) {
+    return { valid: false, reason: 'Domain is required' };
+  }
+
+  const host = stripDidWebPort(domain.trim());
+  const unbracketedHost = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
+
+  if (LOOPBACK_HOSTNAMES.has(unbracketedHost.toLowerCase())) {
+    return {
+      valid: false,
+      reason: `'${domain}' is a loopback address and cannot be used for did:web - did:web requires a publicly resolvable domain.`
+    };
+  }
+
+  const isIpLiteral = unbracketedHost.includes(':') || IPV4_LITERAL_REGEX.test(unbracketedHost);
+  if (isIpLiteral) {
+    if (isPrivateIp(unbracketedHost)) {
+      return {
+        valid: false,
+        reason: `'${domain}' is a private/internal or loopback IP address and cannot be used for did:web - did:web requires a publicly resolvable domain.`
+      };
+    }
+    // A public IP literal (v4 or v6) is an unusual but valid did:web domain.
+    return { valid: true };
+  }
+
+  if (!HOSTNAME_REGEX.test(unbracketedHost)) {
+    return {
+      valid: false,
+      reason: `'${domain}' is not a valid hostname for did:web - expected a fully-qualified public domain name (e.g. 'issuer.example.com').`
+    };
+  }
+
+  return { valid: true };
 }

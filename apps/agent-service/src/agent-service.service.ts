@@ -79,6 +79,7 @@ import { NATSClient } from '@credebl/common/NATSClient';
 import { SignDataDto } from '../../api-gateway/src/agent-service/dto/agent-service.dto';
 import { IVerificationMethod } from 'apps/organization/interfaces/organization.interface';
 import { getAgentUrl } from '@credebl/common/common.utils';
+import { validateDidWebDomain } from '@credebl/common/utils/url-validator.util';
 import {
   IX509ImportCertificateOptionsDto,
   x509CertificateDecodeDto,
@@ -908,6 +909,27 @@ export class AgentServiceService {
           }
         }
       }
+
+      if (createDidPayload.method === DidMethod.WEB) {
+        // did:web's domain must be derived from this org's actual public
+        // endpoint, never taken as-is from the request - otherwise a
+        // client could (accidentally, via a stale UI, or deliberately)
+        // mint a did:web pointing at an address this agent isn't really
+        // reachable at. agentEndPoint itself is the Docker-internal
+        // address used to administer the agent and is never suitable here.
+        if (!agentDetails.publicAgentEndPoint) {
+          throw new BadRequestException(ResponseMessages.agent.error.publicAgentEndpointNotConfigured);
+        }
+
+        const domain = agentDetails.publicAgentEndPoint.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        const domainValidation = validateDidWebDomain(domain);
+        if (!domainValidation.valid) {
+          throw new BadRequestException(domainValidation.reason);
+        }
+
+        createDidPayload.domain = domain;
+      }
+
       const getApiKey = await this.getOrgAgentApiKey(orgId);
       const url = this.constructUrl(agentDetails);
 
@@ -916,7 +938,13 @@ export class AgentServiceService {
       }
 
       const { isPrimaryDid, ...payload } = createDidPayload;
-      const didDetails = await this.getDidDetails(url, payload, getApiKey);
+      // Only did:web needs the agent itself to know which DID is primary -
+      // its unauthenticated /.well-known/did.json endpoint has no other way
+      // to find out, since the agent process has no access to this
+      // platform database. Every other method keeps isPrimaryDid purely a
+      // platform-side concern, same as before.
+      const agentPayload = createDidPayload.method === DidMethod.WEB ? { ...payload, isPrimaryDid } : payload;
+      const didDetails = await this.getDidDetails(url, agentPayload, getApiKey);
       const getDidByOrg = await this.agentServiceRepository.getOrgDid(orgId);
 
       await this.checkDidExistence(getDidByOrg, didDetails);
