@@ -411,7 +411,7 @@ export class Oid4vcVerificationController {
       this.logger.debug(`Verifier session details fetched successfully for orgId: ${orgId}`);
 
       return res.status(HttpStatus.OK).json({
-        success: true,
+        statusCode: HttpStatus.OK,
         message: 'Verification presentation details retrieved successfully.',
         data: result
       });
@@ -472,7 +472,7 @@ export class Oid4vcVerificationController {
       );
 
       return res.status(HttpStatus.OK).json({
-        success: true,
+        statusCode: HttpStatus.OK,
         message: 'Verification presentation response details retrieved successfully.',
         data: result
       });

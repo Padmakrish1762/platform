@@ -155,12 +155,12 @@ export class PexInputDescriptorDto {
   @IsString()
   name?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: { 'vc+sd-jwt': {} },
     description: 'Supported credential format'
   })
-  @IsDefined()
-  format: Record<string, unknown>;
+  @IsOptional()
+  format?: Record<string, unknown>;
 
   @ApiProperty({ type: PexConstraintDto })
   @IsDefined()
