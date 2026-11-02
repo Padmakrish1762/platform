@@ -610,6 +610,9 @@ model oidc_issuer {
 
   organisation organisation? @relation(fields: [orgId], references: [id])
 
+  ecosystemId String?    @db.Uuid
+  ecosystem   ecosystem? @relation(fields: [ecosystemId], references: [id])
+
 
   @@index([orgAgentId])
 }
@@ -822,6 +825,7 @@ model ecosystem {
 
   ecosystemOrgs        ecosystem_orgs[]
   ecosystemInvitations ecosystem_invitations[]
+  oidcIssuers          oidc_issuer[]
   intent              intents[]
   ledgers              Json?
 }

@@ -199,7 +199,19 @@ export class EcosystemService {
         throw new BadRequestException(ResponseMessages.ecosystem.error.userIdMissing);
       }
 
-      const invitation = await this.ecosystemRepository.findAcceptedInvitationByUserId(userId);
+      const user = await this.userRepository.getUserById(userId);
+
+      if (!user) {
+        throw new Error('Error fetching user');
+      }
+
+      // A platform admin can invite someone before they've even signed up -
+      // that invitation is stored with userId: null since there's no real
+      // user yet, and nothing backfills it afterward. Falling back to an
+      // email-based lookup covers that ordering too.
+      const invitation =
+        (await this.ecosystemRepository.findAcceptedInvitationByUserId(userId)) ||
+        (await this.ecosystemRepository.findAcceptedEcosystemCreationInvitationByEmail(user.email));
 
       if (!invitation) {
         throw new ForbiddenException(ResponseMessages.ecosystem.error.invitationRequiredFromPlatformAdmin);
@@ -208,12 +220,6 @@ export class EcosystemService {
 
       if (ecosystemExist) {
         throw new ConflictException(ResponseMessages.ecosystem.error.exists);
-      }
-
-      const user = await this.userRepository.getUserById(userId);
-
-      if (!user) {
-        throw new Error('Error fetching user');
       }
 
       const ecosystem = await this.prisma.$transaction(async (tx) => {

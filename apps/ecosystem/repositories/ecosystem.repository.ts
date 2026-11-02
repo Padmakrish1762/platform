@@ -299,6 +299,34 @@ export class EcosystemRepository {
   }
 
   /**
+   * Fallback for createEcosystem's eligibility check. An ecosystem-creation
+   * invitation sent to an email that didn't have an account yet is stored
+   * with `userId: null` (see createEcosystemInvitation above) - nothing
+   * ever backfills it once that person signs up, so a lookup by the now-real
+   * userId never matches. The invitation's email is reliable in both
+   * orderings (invite-then-signup or signup-then-invite), so this is the
+   * check that actually works regardless of which happened first.
+   */
+  // eslint-disable-next-line camelcase
+  async findAcceptedEcosystemCreationInvitationByEmail(email: string): Promise<ecosystem_invitations | null> {
+    if (!email) {
+      throw new BadRequestException('email missing');
+    }
+
+    return this.prisma.ecosystem_invitations.findFirst({
+      where: {
+        email,
+        status: Invitation.ACCEPTED,
+        type: InviteType.ECOSYSTEM,
+        deletedAt: null
+      },
+      orderBy: {
+        createDateTime: 'desc'
+      }
+    });
+  }
+
+  /**
    *
    * @param orgId
    * @returns Get specific organization details from ecosystem
