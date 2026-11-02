@@ -5,6 +5,7 @@ import {
   Controller,
   Logger,
   Post,
+  Put,
   UseGuards,
   BadRequestException,
   Body,
@@ -44,6 +45,7 @@ import { OrgRolesGuard } from '../authz/guards/org-roles.guard';
 import { Validator } from '@credebl/common/validator';
 import { CreateWalletDto } from './dto/create-wallet.dto';
 import { CreateNewDidDto } from './dto/create-new-did.dto';
+import { SetPublicAgentEndpointDto } from './dto/set-public-agent-endpoint.dto';
 import { AgentSpinupValidator, TrimStringParamPipe } from '@credebl/common/cast.helper';
 import { AgentConfigureDto } from './dto/agent-configure.dto';
 import { UnauthorizedErrorDto } from '../dtos/unauthorized-error.dto';
@@ -345,6 +347,42 @@ export class AgentController {
     };
 
     return res.status(HttpStatus.CREATED).json(finalResponse);
+  }
+
+  /**
+   * Set the address this agent is actually publicly reachable at (e.g. a
+   * devtunnel URL) - required before creating a did:web DID, since that
+   * domain is derived from this field rather than the agent's internal
+   * address.
+   * @param orgId The ID of the organization
+   * @param setPublicAgentEndpointDto The public endpoint to configure
+   * @param res The response object
+   */
+  @Put('/orgs/:orgId/agents/public-endpoint')
+  @ApiOperation({
+    summary: 'Set public agent endpoint',
+    description: "Configure the agent's publicly reachable endpoint, required before creating a did:web DID"
+  })
+  @UseGuards(AuthGuard('jwt'), OrgRolesGuard)
+  @Roles(OrgRoles.OWNER, OrgRoles.ADMIN)
+  @ApiResponse({ status: HttpStatus.OK, description: 'Success', type: ApiResponseDto })
+  async setPublicAgentEndpoint(
+    @Param('orgId') orgId: string,
+    @Body() setPublicAgentEndpointDto: SetPublicAgentEndpointDto,
+    @Res() res: Response
+  ): Promise<Response> {
+    const agentDetails = await this.agentService.setPublicAgentEndpoint(
+      orgId,
+      setPublicAgentEndpointDto.publicEndpoint
+    );
+
+    const finalResponse: IResponse = {
+      statusCode: HttpStatus.OK,
+      message: ResponseMessages.agent.success.setPublicAgentEndpoint,
+      data: agentDetails
+    };
+
+    return res.status(HttpStatus.OK).json(finalResponse);
   }
 
   /**

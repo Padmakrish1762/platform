@@ -370,6 +370,7 @@ export const ResponseMessages = {
       create: 'Organization wallet created successfully',
       createWallet: 'Wallet created successfully',
       createDid: 'Did created successfully',
+      setPublicAgentEndpoint: 'Public agent endpoint configured successfully',
       health: 'Agent health details retrieved successfully.',
       ledgerConfig: 'Ledger config details fetched successfully.',
       sign: 'Payload signed successfully.',

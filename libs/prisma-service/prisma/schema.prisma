@@ -222,6 +222,14 @@ model org_agents {
   orgDid              String?             @db.VarChar
   verkey              String?             @db.VarChar
   agentEndPoint       String?             @db.VarChar
+  // The address this agent is actually publicly reachable at (e.g. a
+  // devtunnel URL) - distinct from agentEndPoint, which is the Docker-
+  // internal address the platform uses to administer this agent and must
+  // stay that way for the many other call sites that use it. Unset until
+  // an operator explicitly configures a public endpoint; did:web creation
+  // is derived from this field, never from agentEndPoint, so a did:web
+  // can't silently end up pointing at a private/internal address.
+  publicAgentEndPoint String?             @db.VarChar
   agentId             String?             @db.Uuid
   isDidPublic         Boolean?
   agentSpinUpStatus   Int?

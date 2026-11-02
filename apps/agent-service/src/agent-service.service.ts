@@ -985,6 +985,35 @@ export class AgentServiceService {
     }
   }
 
+  /**
+   * Records the address this agent is actually publicly reachable at (e.g.
+   * a devtunnel URL), distinct from agentEndPoint (the Docker-internal
+   * address used to administer the agent internally). did:web creation
+   * derives its domain from this field, so it has to be set here first -
+   * this replaces manually recreating the agent container with different
+   * env vars (the old ad hoc fix-agent-tunnel-url.sh workaround) with a
+   * real, DB-tracked platform action.
+   */
+  async setPublicAgentEndpoint(orgId: string, publicEndpoint: string): Promise<org_agents> {
+    try {
+      const domain = publicEndpoint.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const domainValidation = validateDidWebDomain(domain);
+      if (!domainValidation.valid) {
+        throw new BadRequestException(domainValidation.reason);
+      }
+
+      const agentDetails = await this.agentServiceRepository.getOrgAgentDetails(orgId);
+      if (!agentDetails) {
+        throw new NotFoundException(ResponseMessages.agent.error.orgAgentNotFound);
+      }
+
+      return await this.agentServiceRepository.updatePublicAgentEndpoint(orgId, publicEndpoint);
+    } catch (error) {
+      this.logger.error(`error in setPublicAgentEndpoint : ${JSON.stringify(error)}`);
+      throw new RpcException(error.response ? error.response : error);
+    }
+  }
+
   private constructUrl(agentDetails): string {
     return `${agentDetails.agentEndPoint}${CommonConstants.URL_AGENT_WRITE_DID}`;
   }

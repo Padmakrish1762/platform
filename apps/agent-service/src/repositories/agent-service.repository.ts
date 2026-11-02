@@ -301,6 +301,27 @@ export class AgentServiceRepository {
   }
 
   /**
+   * The address this agent is actually publicly reachable at (e.g. a
+   * devtunnel URL) - distinct from agentEndPoint, which stays the Docker-
+   * internal address the platform uses to administer the agent.
+   */
+  async updatePublicAgentEndpoint(orgId: string, publicAgentEndPoint: string): Promise<org_agents> {
+    try {
+      return await this.prisma.org_agents.update({
+        where: {
+          orgId
+        },
+        data: {
+          publicAgentEndPoint
+        }
+      });
+    } catch (error) {
+      this.logger.error(`[updatePublicAgentEndpoint] - Update publicAgentEndPoint: ${JSON.stringify(error)}`);
+      throw error;
+    }
+  }
+
+  /**
    * Get agent details
    * @param orgId
    * @returns

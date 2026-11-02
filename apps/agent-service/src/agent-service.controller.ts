@@ -70,6 +70,11 @@ export class AgentServiceController {
     return this.agentServiceService.createDid(payload.createDidDto, payload.orgId, payload.user);
   }
 
+  @MessagePattern({ cmd: 'set-public-agent-endpoint' })
+  async setPublicAgentEndpoint(payload: { orgId: string; publicEndpoint: string }): Promise<object> {
+    return this.agentServiceService.setPublicAgentEndpoint(payload.orgId, payload.publicEndpoint);
+  }
+
   @MessagePattern({ cmd: 'create-wallet' })
   async createWallet(payload: { createWalletDto: IWallet; user: IUserRequestInterface }): Promise<ITenantRecord> {
     return this.agentServiceService.createWallet(payload.createWalletDto);
