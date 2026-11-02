@@ -3,7 +3,6 @@ import { CommonConstants, MICRO_SERVICE_NAME } from '@credebl/common/common.cons
 import { ConditionalModule, ConfigModule } from '@nestjs/config';
 import { MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
 
-import { AgentController } from './agent/agent.controller';
 import { AgentModule } from './agent-service/agent-service.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -127,6 +126,6 @@ export class AppModule {
         'issue-credentials/national-id',
         'labels/:id'
       )
-      .forRoutes(AgentController, RevocationController);
+      .forRoutes(RevocationController);
   }
 }
