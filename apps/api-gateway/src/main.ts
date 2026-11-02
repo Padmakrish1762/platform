@@ -1,4 +1,5 @@
 import { otelSDK } from './tracer';
+import * as AWS from 'aws-sdk';
 import * as dotenv from 'dotenv';
 import * as express from 'express';
 
@@ -172,6 +173,59 @@ async function bootstrap(): Promise<void> {
   app.use(express.static('uploadedFiles/import'));
   app.use('/uploadedFiles/dev-org-logo', express.static('uploadedFiles/dev-org-logo'));
   app.use('/uploadedFiles/demo-shortening-url', express.static('uploadedFiles/demo-shortening-url'));
+
+  // Serve stored invitation objects from S3 for mobile wallets and web clients
+  app.use(['/default', '/persist'], async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    try {
+      const fullPath = (req.baseUrl + req.path).replace(/^\/+/, '');
+      const s3Key = fullPath.startsWith('default/') ? fullPath.substring(8) : fullPath;
+      if (!s3Key || 'default' === s3Key || 'persist' === s3Key) {
+        return next();
+      }
+
+      const s3 = new AWS.S3({
+        accessKeyId: process.env.AWS_S3_STOREOBJECT_ACCESS_KEY || process.env.AWS_ACCESS_KEY,
+        secretAccessKey: process.env.AWS_S3_STOREOBJECT_SECRET_KEY || process.env.AWS_SECRET_KEY,
+        region: process.env.AWS_S3_STOREOBJECT_REGION || process.env.AWS_REGION
+      });
+
+      const s3Data = await s3
+        .getObject({
+          Bucket: process.env.STOREOBJECT_BUCKET,
+          Key: s3Key
+        })
+        .promise();
+
+      const content = s3Data.Body.toString('utf-8');
+      let targetUrl = content;
+      try {
+        const parsed = JSON.parse(content);
+        if ('string' === typeof parsed) {
+          targetUrl = parsed;
+        }
+      } catch (e) {
+        // use content as-is
+      }
+
+      if ('string' === typeof targetUrl && targetUrl.startsWith('http')) {
+        const oobIndex = targetUrl.indexOf('?oob=');
+        if (-1 !== oobIndex && req.headers.accept && req.headers.accept.includes('application/json')) {
+          const oobBase64 = targetUrl.substring(oobIndex + 5);
+          try {
+            const decodedJson = Buffer.from(oobBase64, 'base64').toString('utf-8');
+            return res.type('application/json').send(decodedJson);
+          } catch (e) {
+            // fallback
+          }
+        }
+        res.setHeader('Content-Type', 'text/plain');
+        return res.status(200).send(targetUrl);
+      }
+      return res.type('application/json').send(content);
+    } catch (err) {
+      next();
+    }
+  });
 
   // Use custom updatable global pipes
   const reflector = app.get(Reflector);
