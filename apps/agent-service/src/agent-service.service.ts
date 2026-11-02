@@ -262,14 +262,27 @@ export class AgentServiceService {
         throw new BadRequestException(ResponseMessages.agent.error.agentEndpointRequired);
       }
 
-      const { isInitialized } = await this.getAgentHealthData(agentEndpoint, apiKey);
+      // The agent's REST API does not accept the raw apiKey directly on its
+      // protected endpoints (e.g. /agent) - it must first be exchanged for a
+      // short-lived signed JWT via /agent/token, exactly like the agentSpinup
+      // flow already does. Skipping this exchange causes every call below to
+      // fail with 401, regardless of how correct the supplied apiKey is.
+      const agentBaseWalletToken = await this.commonService.getBaseAgentToken(agentEndpoint, apiKey);
+      if (!agentBaseWalletToken) {
+        throw new BadRequestException(ResponseMessages.agent.error.baseWalletToken, {
+          cause: new Error(),
+          description: ResponseMessages.errorMessages.badRequest
+        });
+      }
+
+      const { isInitialized } = await this.getAgentHealthData(agentEndpoint, agentBaseWalletToken);
       if (!isInitialized) {
         throw new BadRequestException(ResponseMessages.agent.error.agentSpinupError);
       }
 
       const [agentsTypeId, encryptedToken, orgAgentTypeId] = await Promise.allSettled([
         this.agentServiceRepository.getAgentTypeDetails(),
-        this.tokenEncryption(apiKey),
+        this.tokenEncryption(agentBaseWalletToken),
         this.agentServiceRepository.getOrgAgentTypeDetails(OrgAgentType.DEDICATED)
       ]).then((results) => {
         const fulfilledValues = results.map((result) => (result.status === 'fulfilled' ? result.value : null));
