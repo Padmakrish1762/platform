@@ -99,22 +99,44 @@ fi
 IP_REGEX="^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$"
 
 # Check if INBOUND_ENDPOINT is a domain or IP address
-if [[ $INBOUND_ENDPOINT =~ ^https?://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+if [[ $INBOUND_ENDPOINT =~ ^https?://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/?$ ]]; then
   echo "INBOUND_ENDPOINT is a domain: $INBOUND_ENDPOINT"
-  # Extracting the domain name without the protocol
-  AGENT_ENDPOINT=$(echo "$INBOUND_ENDPOINT" | sed 's/^https\?:\/\///')
+  # Extracting the domain name without the protocol or any trailing slash
+  # (devtunnel URLs are commonly copied with one, e.g. from VS Code's Ports
+  # panel, and a trailing slash here propagates into APP_URL/AGENT_HTTP_URL,
+  # which later doubles up with the leading slash the agent image appends,
+  # breaking every OID4VC route it registers)
+  AGENT_ENDPOINT=$(echo "$INBOUND_ENDPOINT" | sed 's/^https\?:\/\///;s/\/$//')
+  ADMIN_ENDPOINT="$AGENT_ENDPOINT"
 else
   # Check if the input is an IP address
   if [[ $INBOUND_ENDPOINT =~ $IP_REGEX ]]; then
     echo "INBOUND_ENDPOINT is an IP address: $INBOUND_ENDPOINT"
     # Adding the protocol to the IP address
     AGENT_ENDPOINT="${PROTOCOL}://${INBOUND_ENDPOINT}:${INBOUND_PORT}"
+    ADMIN_ENDPOINT="${INBOUND_ENDPOINT}:${ADMIN_PORT}"
   else
     echo "Invalid input for INBOUND_ENDPOINT: $INBOUND_ENDPOINT"
+    ADMIN_ENDPOINT="localhost:${ADMIN_PORT}"
   fi
 fi
 
 echo "-----$AGENT_ENDPOINT----"
+
+# APP_URL/AGENT_HTTP_URL is how this agent self-references when minting and
+# then immediately self-verifying its own OID4VCI OAuth2 tokens (it fetches
+# its own JWKS at <APP_URL>/jwks). The credo-controller image hardcodes both
+# to localhost:8001 by default via agent.env, which only happens to be
+# correct for the very first agent ever provisioned on a host (admin port
+# 8001). Every subsequent org gets a different ADMIN_PORT but inherits the
+# same stale agent.env value, so the agent ends up trying to verify its own
+# tokens against a port nothing is listening on. Overriding APP_URL/
+# AGENT_HTTP_URL here (inline `environment:` wins over `env_file` for the
+# same key in Docker Compose) using this container's own already-computed
+# ADMIN_ENDPOINT fixes that self-reference for every org, not just the first.
+APP_URL="$ADMIN_ENDPOINT"
+AGENT_HTTP_URL="${PROTOCOL}://${ADMIN_ENDPOINT}"
+echo "-----APP_URL=$APP_URL AGENT_HTTP_URL=$AGENT_HTTP_URL----"
 CONFIG_FILE="${PWD}/apps/agent-provisioning/AFJ/agent-config/${AGENCY}_${CONTAINER_NAME}.json"
 
 # Check if the file exists
@@ -180,6 +202,8 @@ services:
     restart: always
     environment:
       AFJ_REST_LOG_LEVEL: 1
+      APP_URL: ${APP_URL}
+      AGENT_HTTP_URL: ${AGENT_HTTP_URL}
     ports:
      - ${INBOUND_PORT}:${INBOUND_PORT}
      - ${ADMIN_PORT}:${ADMIN_PORT}
@@ -235,21 +259,15 @@ if [ $? -eq 0 ]; then
       fi
     done
 
-    echo "Creating agent config"
-    # This is not actually being read, maybe we can remove this logic for endpoint file
-    ENDPOINT="${PWD}/endpoints/${AGENCY}_${CONTAINER_NAME}.json"
-
-    # Check if the file exists
-    if [ -f "$ENDPOINT" ]; then
-      # If it exists, remove the file
-      rm "$ENDPOINT"
-    fi
-    mkdir -p "$PWD/agent-provisioning/AFJ/endpoints"
+    mkdir -p "${PWD}/apps/agent-provisioning/AFJ/endpoints"
+    mkdir -p "${PWD}/endpoints"
+    ENDPOINT="${PWD}/apps/agent-provisioning/AFJ/endpoints/${AGENCY}_${CONTAINER_NAME}.json"
     cat <<EOF >${ENDPOINT}
     {
         "CONTROLLER_ENDPOINT":"${EXTERNAL_IP}:${ADMIN_PORT}"
     }
 EOF
+    cp "${ENDPOINT}" "${PWD}/endpoints/${AGENCY}_${CONTAINER_NAME}.json" 2>/dev/null || true
 
     echo "Agent config created"
   else
