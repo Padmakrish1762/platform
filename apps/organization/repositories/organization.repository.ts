@@ -474,6 +474,10 @@ export class OrganizationRepository {
               didDocument: true,
               walletName: true,
               agentEndPoint: true,
+              // Needed so the Studio UI can prefill/validate a did:web domain
+              // against the address this agent is actually publicly reachable
+              // at, instead of agentEndPoint (the Docker-internal admin address).
+              publicAgentEndPoint: true,
               agentSpinUpStatus: true,
               agentsTypeId: true,
               orgAgentTypeId: true,
