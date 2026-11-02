@@ -24,8 +24,7 @@ export interface ISignerOption {
 
 export enum AuthenticationType {
   PRE_AUTHORIZED_CODE = 'preAuthorizedCodeFlow',
-  AUTHORIZATION_CODE = 'authorizationCodeFlow',
-  NO_AUTH = 'noAuth'
+  AUTHORIZATION_CODE = 'authorizationCodeFlow'
 }
 
 /* ---------------------------------------------------------

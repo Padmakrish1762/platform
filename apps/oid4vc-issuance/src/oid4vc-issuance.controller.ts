@@ -52,6 +52,12 @@ export class Oid4vcIssuanceController {
     return this.oid4vcIssuanceService.oidcIssuers(orgId);
   }
 
+  @MessagePattern({ cmd: 'oid4vc-trust-registry-by-did' })
+  async getTrustRegistryByDid(payload: { did: string }): ReturnType<Oid4vcIssuanceService['getTrustRegistryByDid']> {
+    const { did } = payload;
+    return this.oid4vcIssuanceService.getTrustRegistryByDid(did);
+  }
+
   @MessagePattern({ cmd: 'oid4vc-delete-issuer' })
   async deleteOidcIssuer(payload: {
     orgId: string;

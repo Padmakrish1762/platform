@@ -198,6 +198,32 @@ export class Oid4vcIssuanceController {
     return res.status(HttpStatus.OK).json(finalResponse);
   }
 
+  @Get('/trust-registry/issuers/:did')
+  @ApiOperation({
+    summary: 'Trust registry lookup by DID',
+    description:
+      'Public, unauthenticated lookup: given a DID, reports whether it is an ACTIVE, ecosystem-governed ' +
+      'OID4VC issuer, and which credential types it is authorized to offer. Trust is computed live against ' +
+      "the org's current ecosystem membership status on every call, so deactivating an org in its ecosystem " +
+      'takes effect immediately with no separate revocation step. Issuers never registered under an ecosystem ' +
+      'are not part of the trust registry at all and will return trusted: false with an empty issuers list — ' +
+      'this does not mean the credential itself is invalid, only that there is nothing here vouching for it.'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Trust registry entry fetched successfully.',
+    type: ApiResponseDto
+  })
+  async getTrustRegistryByDid(@Param('did') did: string, @Res() res: Response): Promise<Response> {
+    const trustRegistryEntry = await this.oid4vcIssuanceService.getTrustRegistryByDid(did);
+    const finalResponse: IResponse = {
+      statusCode: HttpStatus.OK,
+      message: 'Trust registry entry fetched successfully',
+      data: trustRegistryEntry
+    };
+    return res.status(HttpStatus.OK).json(finalResponse);
+  }
+
   @Delete('/orgs/:orgId/oid4vc/issuers/:id')
   @ApiOperation({
     summary: 'Delete OID4VC issuer',

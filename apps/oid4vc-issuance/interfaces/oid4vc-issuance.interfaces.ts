@@ -59,6 +59,7 @@ export interface IssuerCreation {
   dpopSigningAlgValuesSupported?: string[];
   authorizationServerConfigs: AuthorizationServerConfig;
   batchCredentialIssuanceSize: number;
+  ecosystemId?: string;
 }
 
 export interface IssuerInitialConfig {
@@ -81,6 +82,7 @@ export interface IssuerMetadata {
   batchCredentialIssuanceSize?: number;
   isPrimary: boolean;
   orgId: string;
+  ecosystemId?: string;
 }
 
 export interface initialIssuerDetails {

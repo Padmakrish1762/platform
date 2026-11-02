@@ -198,7 +198,8 @@ export class Oid4vcIssuanceRepository {
         batchCredentialIssuanceSize,
         authorizationServerUrl,
         isPrimary,
-        orgId
+        orgId,
+        ecosystemId
       } = issuerMetadata;
       const oidcIssuerDetails = await this.prisma.oidc_issuer.create({
         data: {
@@ -209,13 +210,96 @@ export class Oid4vcIssuanceRepository {
           batchCredentialIssuanceSize,
           authorizationServerUrl,
           isPrimary,
-          orgId
+          orgId,
+          ecosystemId
         }
       });
 
       return oidcIssuerDetails;
     } catch (error) {
       this.logger.error(`[addOidcIssuerDetails] - error: ${JSON.stringify(error)}`);
+      throw error;
+    }
+  }
+
+  async isOrgActiveInEcosystem(orgId: string, ecosystemId: string): Promise<boolean> {
+    try {
+      const membership = await this.prisma.ecosystem_orgs.findFirst({
+        where: {
+          orgId,
+          ecosystemId,
+          status: 'ACTIVE'
+        }
+      });
+      return Boolean(membership);
+    } catch (error) {
+      this.logger.error(`[isOrgActiveInEcosystem] - error: ${JSON.stringify(error)}`);
+      throw error;
+    }
+  }
+
+  async getTrustRegistryEntriesByDid(did: string): Promise<
+    {
+      publicIssuerId: string;
+      orgId: string;
+      ecosystemId: string;
+      ecosystemName: string;
+      ecosystemOrgStatus: string;
+      credentialTypesOffered: string[];
+    }[]
+  > {
+    try {
+      const orgDid = await this.prisma.org_dids.findFirst({
+        where: { did }
+      });
+      if (!orgDid) {
+        return [];
+      }
+
+      const issuers = await this.prisma.oidc_issuer.findMany({
+        where: {
+          orgId: orgDid.orgId,
+          ecosystemId: { not: null }
+        },
+        include: {
+          ecosystem: true,
+          templates: true
+        }
+      });
+
+      const results: {
+        publicIssuerId: string;
+        orgId: string;
+        ecosystemId: string;
+        ecosystemName: string;
+        ecosystemOrgStatus: string;
+        credentialTypesOffered: string[];
+      }[] = [];
+
+      for (const issuer of issuers) {
+        if (!issuer.ecosystemId || !issuer.ecosystem) {
+          continue;
+        }
+        const membership = await this.prisma.ecosystem_orgs.findFirst({
+          where: {
+            orgId: orgDid.orgId,
+            ecosystemId: issuer.ecosystemId
+          }
+        });
+
+        results.push({
+          publicIssuerId: issuer.publicIssuerId,
+          orgId: orgDid.orgId,
+          ecosystemId: issuer.ecosystemId,
+          ecosystemName: issuer.ecosystem.name,
+          ecosystemOrgStatus: membership?.status ?? 'NOT_A_MEMBER',
+          credentialTypesOffered: issuer.templates.map((t) => t.name)
+        });
+      }
+
+      return results;
+    } catch (error) {
+      this.logger.error(`[getTrustRegistryEntriesByDid] - error: ${JSON.stringify(error)}`);
       throw error;
     }
   }

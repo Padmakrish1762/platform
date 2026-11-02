@@ -49,6 +49,11 @@ export class Oid4vcIssuanceService extends BaseService {
     return this.natsClient.sendNatsMessage(this.issuanceProxy, 'oid4vc-get-issuers-issuance', payload);
   }
 
+  async getTrustRegistryByDid(did: string): Promise<object> {
+    const payload = { did };
+    return this.natsClient.sendNatsMessage(this.issuanceProxy, 'oid4vc-trust-registry-by-did', payload);
+  }
+
   async oidcDeleteIssuer(userDetails: user, orgId: string, id: string): Promise<object> {
     const payload = { id, orgId, userDetails };
     return this.natsClient.sendNatsMessage(this.issuanceProxy, 'oid4vc-delete-issuer', payload);

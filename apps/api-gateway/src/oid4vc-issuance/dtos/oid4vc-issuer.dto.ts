@@ -1,6 +1,6 @@
 /* eslint-disable camelcase */
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsArray, ValidateNested, IsUrl, IsInt, Min, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsArray, ValidateNested, IsUrl, IsInt, Min, IsBoolean, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class LogoDto {
@@ -88,6 +88,15 @@ export class IssuerCreationDto {
   })
   @IsString({ message: 'issuerId must be a string' })
   issuerId: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Ecosystem to register this issuer under for trust-registry purposes. The calling org must be an ACTIVE member/lead of this ecosystem.',
+    example: '95ccfaee-0ff3-4107-8150-1311568d6f39'
+  })
+  @IsOptional()
+  @IsUUID('4', { message: 'ecosystemId must be a valid UUID' })
+  ecosystemId?: string;
 
   @ApiPropertyOptional({
     description: 'Maximum number of credentials that can be issued in a single batch issuance operation',

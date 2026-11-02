@@ -172,7 +172,17 @@ export class Oid4vcIssuanceService {
 
   async oidcIssuerCreate(issuerCreation: IssuerCreation, orgId: string, userDetails: user): Promise<oidc_issuer> {
     try {
-      const { issuerId, batchCredentialIssuanceSize } = issuerCreation;
+      const { issuerId, batchCredentialIssuanceSize, ecosystemId } = issuerCreation;
+
+      if (ecosystemId) {
+        const isActiveMember = await this.oid4vcIssuanceRepository.isOrgActiveInEcosystem(orgId, ecosystemId);
+        if (!isActiveMember) {
+          throw new BadRequestException(
+            `Org '${orgId}' is not an ACTIVE member/lead of ecosystem '${ecosystemId}' — cannot register a trust-registry-linked issuer under it.`
+          );
+        }
+      }
+
       const agentDetails = await this.oid4vcIssuanceRepository.getAgentEndPoint(orgId);
       if (!agentDetails) {
         throw new NotFoundException(ResponseMessages.issuance.error.agentEndPointNotFound);
@@ -229,7 +239,8 @@ export class Oid4vcIssuanceService {
         orgAgentId,
         batchCredentialIssuanceSize: issuerCreation?.batchCredentialIssuanceSize,
         isPrimary,
-        orgId
+        orgId,
+        ecosystemId
       };
       const addOidcIssuerDetails = await this.oid4vcIssuanceRepository.addOidcIssuerDetails(
         issuerMetadata,
@@ -242,6 +253,46 @@ export class Oid4vcIssuanceService {
       return addOidcIssuerDetails;
     } catch (error) {
       this.logger.error(`[oidcIssuerCreate] - error in oidcIssuerCreate issuance records: ${JSON.stringify(error)}`);
+      throw new RpcException(error?.response ?? error);
+    }
+  }
+
+  /**
+   * Public trust-registry lookup: given a DID, report whether it's an ACTIVE,
+   * ecosystem-governed OID4VC issuer, and which credential types it's allowed to
+   * offer. Computed live against ecosystem_orgs.status on every call — never cached —
+   * so a Lead deactivating a Member org takes effect immediately with no separate
+   * revocation step.
+   */
+  async getTrustRegistryByDid(did: string): Promise<{
+    did: string;
+    trusted: boolean;
+    issuers: {
+      publicIssuerId: string;
+      ecosystemId: string;
+      ecosystemName: string;
+      status: string;
+      credentialTypesOffered: string[];
+    }[];
+  }> {
+    try {
+      const entries = await this.oid4vcIssuanceRepository.getTrustRegistryEntriesByDid(did);
+
+      const issuers = entries.map((entry) => ({
+        publicIssuerId: entry.publicIssuerId,
+        ecosystemId: entry.ecosystemId,
+        ecosystemName: entry.ecosystemName,
+        status: entry.ecosystemOrgStatus,
+        credentialTypesOffered: entry.credentialTypesOffered
+      }));
+
+      return {
+        did,
+        trusted: issuers.some((issuer) => 'ACTIVE' === issuer.status),
+        issuers
+      };
+    } catch (error) {
+      this.logger.error(`[getTrustRegistryByDid] - error: ${JSON.stringify(error)}`);
       throw new RpcException(error?.response ?? error);
     }
   }

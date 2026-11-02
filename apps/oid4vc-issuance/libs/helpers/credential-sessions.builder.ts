@@ -661,13 +661,17 @@ export function buildCredentialOfferPayload(
 
   // Determine which authorization flow to return:
   // Priority:
-  // 1) If authorizationType is 'noAuth', return empty preAuthorizedCodeFlowConfig (no txCode, no authorizationServerUrl)
+  // 1) If authorizationType is 'authorizationCodeFlow', return authorizationCodeFlowConfig using the issuer's AS URL
   // 2) If issuerDetails.authorizationServerUrl is provided, return preAuthorizedCodeFlowConfig using DEFAULT_TXCODE
   // 3) Else fall back to flows present in DTO (still enforce XOR)
-  if (dto.authorizationType === AuthenticationType.NO_AUTH) {
+  if (dto.authorizationType === AuthenticationType.AUTHORIZATION_CODE) {
+    const authServerUrl = issuerDetails?.authorizationServerUrl;
+    if ('string' !== typeof authServerUrl || '' === authServerUrl.trim()) {
+      throw new BadRequestException('authorizationServerUrl is required on the issuer for authorizationCodeFlow.');
+    }
     return {
       ...baseEnvelope,
-      preAuthorizedCodeFlowConfig: {}
+      authorizationCodeFlowConfig: { authorizationServerUrl: authServerUrl }
     };
   }
 
