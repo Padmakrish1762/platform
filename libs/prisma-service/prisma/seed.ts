@@ -187,6 +187,7 @@ const createPlatformUser = async (): Promise<void> => {
 
       logger.log(platformUser);
     } else {
+      platformUserId = existPlatformAdminUser[0].id;
       logger.log('Already seeding in user');
     }
   } catch (error) {
