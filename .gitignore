@@ -10,3 +10,8 @@ uploadedFles/exports
 uploadedFles/import
 uploadedFles/export
 nats-server.conf
+logs/
+.credebl-bootstrap-done
+local-setup/terraform-script/keycloak/.terraform
+local-setup/terraform-script/keycloak/terraform.tfstate*
+local-setup/terraform-script/keycloak/secret.env
