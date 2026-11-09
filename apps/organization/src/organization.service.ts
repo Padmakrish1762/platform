@@ -628,14 +628,19 @@ export class OrganizationService {
     role?: string
   ): Promise<IGetOrganization> {
     try {
+      // Prisma's `contains` doesn't drop out like other filters when the
+      // value is undefined - it matches nothing, so an empty/absent search
+      // term silently returned zero organizations instead of all of them.
       const query = {
         userOrgRoles: {
           some: { userId }
         },
-        OR: [
-          { name: { contains: search, mode: 'insensitive' } },
-          { description: { contains: search, mode: 'insensitive' } }
-        ]
+        ...(search && {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { description: { contains: search, mode: 'insensitive' } }
+          ]
+        })
       };
 
       const filterOptions = { userId };
